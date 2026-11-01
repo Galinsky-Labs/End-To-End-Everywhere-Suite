@@ -49,6 +49,25 @@ def main(binary: str) -> None:
             if output.exists():
                 raise AssertionError("invalid delivery published plaintext")
 
+        # Substituting another valid identity/archive must not satisfy the
+        # separately retained anchor, even when its passphrase is identical.
+        other_state = root / "other-state"
+        other_anchor = execute(command(executable, str(other_state), "init",
+                                       endpoint="other-desktop"), password)
+        if not other_anchor or other_anchor == anchor:
+            raise AssertionError("independent identities did not have distinct anchors")
+        mismatched_output = root / "wrong-identity.txt"
+        try:
+            execute(command(executable, str(other_state), "open-self-file",
+                            "personal-file", str(sealed), str(mismatched_output),
+                            anchor=anchor), password)
+        except VaultError:
+            pass
+        else:
+            raise AssertionError("substituted identity accepted the retained anchor")
+        if mismatched_output.exists():
+            raise AssertionError("substituted identity published plaintext")
+
         denied(sealed, "wrong-context", root / "wrong-context.txt", password)
         denied(sealed, "personal-file", root / "wrong-password.txt", "incorrect-test-passphrase")
         damaged = root / "damaged.e2ed"
