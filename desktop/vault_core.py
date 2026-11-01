@@ -89,6 +89,21 @@ def verify_cli(binary: str) -> None:
         raise VaultError("Selected program does not advertise the required local vault capabilities.")
 
 
+def emitted_anchor(diagnostics: str | bytes | None) -> str | None:
+    """Recover a complete token even when TimeoutExpired returns partial bytes.
+
+    Do not decode or display the remainder of process diagnostics: a selected
+    executable may include sensitive content there. Require a complete line so
+    a truncated token is never offered as recovery material.
+    """
+    if isinstance(diagnostics, str):
+        diagnostics = diagnostics.encode("utf-8", errors="replace")
+    if not isinstance(diagnostics, bytes):
+        return None
+    anchors = re.findall(rb"^ANCHOR ([0-9a-f]{140})\r?\n", diagnostics, re.MULTILINE)
+    return anchors[-1].decode("ascii") if anchors else None
+
+
 def execute(argv: list[str], password: str) -> str | None:
     if not 12 <= len(password.encode("utf-8")) <= 1024 or "\n" in password or "\r" in password:
         raise VaultError("Passphrase must be 12–1024 bytes without a line break.")
@@ -97,13 +112,18 @@ def execute(argv: list[str], password: str) -> str | None:
     try:
         result = subprocess.run(argv, input=credential, text=True,
                                 capture_output=True, timeout=180, check=False)
-    except (OSError, subprocess.TimeoutExpired) as exc:
+    except subprocess.TimeoutExpired as exc:
+        raise VaultError(
+            "Operation timed out and its process was stopped. Local state or output "
+            "may already be committed. Retain any returned anchor and inspect the "
+            "selected destination and state before retrying.", emitted_anchor(exc.stderr)
+        ) from exc
+    except OSError as exc:
         raise VaultError(
             "Operation did not complete normally. Inspect the selected destination "
             "and state before retrying."
         ) from exc
-    anchors = re.findall(r"^ANCHOR ([0-9a-f]{140})$", result.stderr, re.MULTILINE)
-    new_anchor = anchors[-1] if anchors else None
+    new_anchor = emitted_anchor(result.stderr)
     if result.returncode:
         if new_anchor:
             raise VaultError("The operation reported an error after emitting a new anchor. "

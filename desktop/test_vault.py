@@ -166,5 +166,36 @@ class VaultBoundaryTests(unittest.TestCase):
                 vault.command(str(pathlib.Path(sys.executable).resolve()), root, "init", endpoint="me")
 
 
+class InterruptedOperationTests(unittest.TestCase):
+    def test_timeout_preserves_last_complete_anchor_without_exposing_diagnostics(self):
+        anchor = "b" * 140
+        for stderr in ("private diagnostic\nANCHOR " + anchor + "\npartial",
+                       b"private diagnostic\nANCHOR " + anchor.encode() + b"\n\xffpartial"):
+            with self.subTest(stderr_type=type(stderr).__name__):
+                failure = subprocess.TimeoutExpired(["e2ee"], 180, stderr=stderr)
+                with patch.object(vault.subprocess, "run", side_effect=failure) as run:
+                    with self.assertRaises(vault.VaultError) as caught:
+                        vault.execute(["e2ee", "init", "me"], "private-passphrase")
+                    self.assertEqual(caught.exception.anchor, anchor)
+                    self.assertNotIn("private diagnostic", str(caught.exception))
+                    self.assertNotIn(anchor, str(caught.exception))
+                    self.assertIn("may already be committed", str(caught.exception))
+                    self.assertEqual(run.call_count, 1)  # No automatic mutation retry.
+
+    def test_timeout_without_complete_anchor_never_invents_recovery_token(self):
+        for stderr in (None, b"", b"ANCHOR " + b"a" * 139 + b"\n",
+                       b"ANCHOR " + b"a" * 140, b"prefix ANCHOR " + b"a" * 140 + b"\n"):
+            failure = subprocess.TimeoutExpired(["e2ee"], 180, stderr=stderr)
+            with patch.object(vault.subprocess, "run", side_effect=failure):
+                with self.assertRaises(vault.VaultError) as caught:
+                    vault.execute(["e2ee", "init", "me"], "private-passphrase")
+                self.assertIsNone(caught.exception.anchor)
+
+    def test_complete_anchor_lines_allow_crlf_and_choose_last_complete_token(self):
+        first, last = "a" * 140, "b" * 140
+        diagnostics = "ANCHOR " + first + "\r\nANCHOR " + last + "\nANCHOR truncated"
+        self.assertEqual(vault.emitted_anchor(diagnostics), last)
+
+
 if __name__ == "__main__":
     unittest.main()
