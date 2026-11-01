@@ -19,3 +19,5 @@ Run controller tests without opening a display:
 ```sh
 python3 -m unittest discover -s desktop -p 'test_*.py' -v
 ```
+
+Operation lifecycle tests import the toolkit-independent workflow directly, so no desktop state test is skipped merely because Tk is absent on a build host. Running the graphical window still requires Tk. If a process times out after emitting a complete anchor line, the controller retains that token separately for recovery and reports the operation as uncertain; it never retries a mutation automatically. A missing or partial token is never treated as a valid anchor. Inspect state and destination before retrying.
