@@ -155,6 +155,29 @@ class DesktopFailureStateTests(unittest.TestCase):
         self.assertFalse(window._busy)
         self.assertFalse(window._controls[0].disabled)
 
+    def test_cancelled_identity_passphrase_confirmation_never_starts_worker(self):
+        vault, window = self.vault, self.window()
+        window.confirm_passphrase = Mock(return_value=False)
+        with patch.object(vault, "command", return_value=["/trusted/e2ee", "init", "me"]), \
+             patch.object(vault, "Thread") as thread:
+            window.perform("init")
+            window.confirm_passphrase.assert_called_once_with("test-only-passphrase")
+            thread.assert_not_called()
+        self.assertEqual(window.password.get(), "")
+        self.assertFalse(window._busy)
+
+    def test_worker_launch_failure_unlocks_controls_and_clears_secret(self):
+        vault, window = self.vault, self.window()
+        with patch.object(vault, "command", return_value=["/trusted/e2ee"]), \
+             patch.object(vault, "Thread", side_effect=RuntimeError("cannot start new thread")), \
+             patch.object(window.messages, "showerror") as error:
+            window.perform("seal-self-file")
+            error.assert_called_once()
+        self.assertFalse(window._busy)
+        self.assertFalse(window._controls[0].disabled)
+        self.assertEqual(window.password.get(), "")
+        self.assertIsNone(window.scheduled)
+
     def test_pending_result_keeps_window_locked_and_schedules_poll(self):
         window = self.window()
         window.set_busy(True)

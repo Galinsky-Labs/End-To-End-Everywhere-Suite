@@ -58,6 +58,8 @@ class VaultWorkflow:
                 return
             password = self.password.get()
             self.password.set("")
+            if action == "init" and not self.confirm_passphrase(password):
+                return
             self.set_busy(True)
 
             def work() -> None:
@@ -70,7 +72,11 @@ class VaultWorkflow:
                     self._results.put((None, VaultError(
                         "Unexpected local client failure. Inspect selected files and state before retrying.")))
 
-            Thread(target=work, daemon=True).start()
+            try:
+                Thread(target=work, daemon=True).start()
+            except RuntimeError:
+                self.set_busy(False)
+                raise VaultError("Could not start the local operation worker. No operation was launched.")
             self.after(100, self.poll_result)
         except VaultError as exc:
             self.messages.showerror("Vault operation", str(exc), parent=self)

@@ -1,7 +1,7 @@
 """Tk desktop surface for the Suite local encrypted file vault."""
 import tkinter as tk
 from queue import Queue
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from vault_workflow import VaultWorkflow
 
@@ -95,6 +95,18 @@ class VaultWindow(tk.Tk, VaultWorkflow):
         selected = filedialog.asksaveasfilename(parent=self, confirmoverwrite=False)
         if selected:
             self.destination.set(selected)
+
+    def confirm_passphrase(self, password: str) -> bool:
+        repeated = simpledialog.askstring(
+            "Confirm new passphrase", "Enter the new vault passphrase again:",
+            show="•", parent=self
+        )
+        if repeated is None:
+            return False
+        if repeated != password:
+            messagebox.showerror("Vault passphrase", "Passphrases did not match. Identity was not created.", parent=self)
+            return False
+        return True
 
     def show_anchor(self, anchor: str, uncertain: bool = False) -> None:
         dialog = tk.Toplevel(self)
