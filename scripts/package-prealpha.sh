@@ -24,6 +24,7 @@ if [ ! -f "$binary" ] || [ -L "$binary" ]; then
   exit 2
 fi
 python3 "$script_dir/../desktop/integration_smoke.py" "$binary"
+python3 "$script_dir/cross_service_smoke.py" "$binary"
 mkdir -p "$out"
 out="$(cd "$out" && pwd)"
 tmp="$(mktemp -d)"
@@ -36,6 +37,7 @@ cp "$script_dir/../desktop/vault.py" "$tmp/$folder/vault.py"
 cp "$script_dir/../desktop/vault_core.py" "$tmp/$folder/vault_core.py"
 cp "$script_dir/../desktop/vault_workflow.py" "$tmp/$folder/vault_workflow.py"
 cp "$script_dir/../desktop/README.md" "$tmp/$folder/DESKTOP-README.md"
+cp "$script_dir/cross_service_smoke.py" "$tmp/$folder/cross_service_smoke.py"
 cat > "$tmp/$folder/SECURITY-NOTICE.txt" <<'NOTE'
 END-TO-END EVERYWHERE SUITE - UNSIGNED PRE-ALPHA TEST BUILD
 Not an audited secure messenger, production service, or installer.
@@ -45,6 +47,7 @@ A same-source SHA-256 checksum detects corruption, not authentic provenance.
 Use only test data. Read the repository's security limitations before use.
 The optional Tk desktop vault uses the same CLI and local file limitations.
 Its capability inventory is self-reported, not executable provenance.
+A local two-endpoint carrier-transfer smoke test is supplied for test data only.
 NOTE
 archive="$out/$folder.tar.gz"
 tar -czf "$archive" -C "$tmp" "$folder"
