@@ -2,8 +2,8 @@
 services:
   - type: web
     runtime: static
-    name: e2ee-suite-information
-    repo: https://github.com/neophilism/End-To-End-Everywhere-Suite
+    name: end-to-end-everywhere-suite
+    repo: https://github.com/Galinsky-Labs/End-To-End-Everywhere-Suite
     branch: main
     buildCommand: python3 scripts/check-public-site.py
     staticPublishPath: ./site/public
