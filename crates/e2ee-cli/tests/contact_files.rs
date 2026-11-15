@@ -45,7 +45,11 @@ fn cli(state: &Path, commands: &[&str]) -> Output {
         .stderr(Stdio::piped())
         .spawn()
         .unwrap();
-    child.stdin.take().unwrap().write_all(PASSPHRASE).unwrap();
+    // The binary may reject its arguments and exit before reading stdin;
+    // BrokenPipe is expected then and the caller checks the exit status.
+    if let Err(error) = child.stdin.take().unwrap().write_all(PASSPHRASE) {
+        assert_eq!(error.kind(), std::io::ErrorKind::BrokenPipe, "{error}");
+    }
     child.wait_with_output().unwrap()
 }
 fn output(result: Output) -> String {
