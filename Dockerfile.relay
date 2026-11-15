@@ -1,0 +1,14 @@
+# Pre-alpha ciphertext relay/sync server (E2ES-054/055). TLS is terminated by the platform.
+FROM rust:1-slim-bookworm AS build
+WORKDIR /src
+COPY . .
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev && rm -rf /var/lib/apt/lists/* \
+ && cargo build --release --locked -p e2ee-relay-server
+
+FROM debian:bookworm-slim
+RUN useradd --system --uid 10001 relay && mkdir /data && chown relay /data
+COPY --from=build /src/target/release/e2ee-relay-server /usr/local/bin/e2ee-relay-server
+USER relay
+ENV RELAY_DB_PATH=/data/relay.sqlite3 PORT=10000
+EXPOSE 10000
+CMD ["e2ee-relay-server"]

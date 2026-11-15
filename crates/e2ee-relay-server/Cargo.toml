@@ -1,0 +1,23 @@
+[package]
+name = "e2ee-relay-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Authenticated ciphertext-only relay and device-sync HTTP service (pre-alpha)"
+
+[dependencies]
+base64 = "=0.22.1"
+e2ee-capsule = { path = "../e2ee-capsule" }
+e2ee-transport = { path = "../e2ee-transport" }
+ed25519-dalek = { version = "=3.0.0", default-features = false, features = ["alloc", "fast", "zeroize"] }
+getrandom = "=0.4.3"
+rusqlite = { version = "=0.32.1", features = ["bundled"] }
+sha2 = "=0.11.0"
+tiny_http = "=0.12.0"
+
+[dev-dependencies]
+e2ee-message = { path = "../e2ee-message" }
+e2ee-provenance = { path = "../e2ee-provenance" }
+
+[lints]
+workspace = true

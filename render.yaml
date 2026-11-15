@@ -1,4 +1,4 @@
-# Static informational presence only; no backend or encryption service is deployed.
+# Static informational site plus a pre-alpha ciphertext-only relay/sync service.
 services:
   - type: web
     runtime: static
@@ -21,3 +21,15 @@ services:
       - path: /*
         name: Content-Security-Policy
         value: "default-src 'none'; style-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+  - type: web
+    runtime: docker
+    name: e2ee-relay
+    repo: https://github.com/Galinsky-Labs/End-To-End-Everywhere-Suite
+    branch: main
+    plan: free
+    region: ohio
+    dockerfilePath: ./Dockerfile.relay
+    healthCheckPath: /healthz
+    # Free instances have no persistent disk: the SQLite queue survives process
+    # activity but NOT restarts/redeploys. Durable production use needs a
+    # persistent disk or a Postgres backend (not implemented yet).
