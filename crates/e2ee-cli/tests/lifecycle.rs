@@ -50,7 +50,11 @@ fn invoke(directory: &Path, command: &[&str], credentials: &[u8], anchor: Option
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     let mut child = process.spawn().unwrap();
-    child.stdin.take().unwrap().write_all(credentials).unwrap();
+    // The binary may reject its arguments and exit before reading stdin;
+    // BrokenPipe is expected then and the caller checks the exit status.
+    if let Err(error) = child.stdin.take().unwrap().write_all(credentials) {
+        assert_eq!(error.kind(), std::io::ErrorKind::BrokenPipe, "{error}");
+    }
     child.wait_with_output().unwrap()
 }
 
