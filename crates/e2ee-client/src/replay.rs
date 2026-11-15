@@ -152,7 +152,10 @@ mod tests {
         let mut count_excess = good.clone();
         count_excess[6..10].copy_from_slice(&((MAX_RECEIPTS as u32) + 1).to_be_bytes());
         for malformed in [bad_magic, bad_version, count_mismatch, count_excess] {
-            assert!(matches!(ReplayLedger::decode(&malformed), Err(ReplayError::Malformed)));
+            assert!(matches!(
+                ReplayLedger::decode(&malformed),
+                Err(ReplayError::Malformed)
+            ));
         }
         assert!(ReplayLedger::decode(&good).is_ok());
     }
