@@ -102,6 +102,7 @@ pub enum EnrollmentError {
     InvalidIdentifier,
     InvalidExpiry,
     NotYetValid,
+    ClockRollback,
     Expired,
     EndpointReuse,
     InvalidState,
@@ -115,6 +116,7 @@ impl fmt::Display for EnrollmentError {
             Self::InvalidIdentifier => "enrollment identifier is invalid",
             Self::InvalidExpiry => "pairing expiry is invalid",
             Self::NotYetValid => "pairing offer is not yet valid",
+            Self::ClockRollback => "pairing clock moved backwards",
             Self::Expired => "pairing offer has expired",
             Self::EndpointReuse => "new endpoint must differ from existing endpoint",
             Self::InvalidState => "operation is not valid in the current pairing state",
@@ -134,6 +136,9 @@ pub struct PairingSession {
     existing_digest: Option<VerificationDigest>,
     new_digest: Option<VerificationDigest>,
     finalized_at_unix_seconds: Option<u64>,
+    /// Latest accepted observation time. Pairing transitions must not move
+    /// backwards, otherwise a rolled-back clock could extend an offer's life.
+    last_observed_unix_seconds: u64,
 }
 
 impl PairingSession {
@@ -151,6 +156,7 @@ impl PairingSession {
             existing_digest: None,
             new_digest: None,
             finalized_at_unix_seconds: None,
+            last_observed_unix_seconds: now_unix_seconds,
         })
     }
 
@@ -235,9 +241,12 @@ impl PairingSession {
         self.authorization().is_ok()
     }
 
-    fn ensure_live(&self, now_unix_seconds: u64) -> Result<(), EnrollmentError> {
+    fn ensure_live(&mut self, now_unix_seconds: u64) -> Result<(), EnrollmentError> {
         if now_unix_seconds < self.offer.created_at_unix_seconds {
             return Err(EnrollmentError::NotYetValid);
+        }
+        if now_unix_seconds < self.last_observed_unix_seconds {
+            return Err(EnrollmentError::ClockRollback);
         }
         if now_unix_seconds >= self.offer.expires_at_unix_seconds {
             return Err(EnrollmentError::Expired);
@@ -245,6 +254,7 @@ impl PairingSession {
         if self.state == PairingState::Aborted || self.state == PairingState::Finalized {
             return Err(EnrollmentError::InvalidState);
         }
+        self.last_observed_unix_seconds = now_unix_seconds;
         Ok(())
     }
 }
@@ -500,10 +510,32 @@ mod tests {
 
     #[test]
     fn pairing_cannot_begin_before_offer_creation() {
-        assert!(matches!(PairingSession::new(offer(), 99), Err(EnrollmentError::NotYetValid)));
+        assert!(matches!(
+            PairingSession::new(offer(), 99),
+            Err(EnrollmentError::NotYetValid)
+        ));
         let mut session = PairingSession::new(offer(), 110).unwrap();
         assert_eq!(session.accept(99), Err(EnrollmentError::NotYetValid));
         assert_eq!(session.state(), PairingState::Offered);
+    }
+
+    #[test]
+    fn pairing_transitions_reject_backwards_clock() {
+        let mut session = PairingSession::new(offer(), 120).unwrap();
+        // After creation, time moving backwards (still after offer creation)
+        // must not be accepted as a later transition.
+        assert_eq!(session.accept(110), Err(EnrollmentError::ClockRollback));
+        assert_eq!(session.state(), PairingState::Offered);
+        session.accept(125).unwrap();
+        assert_eq!(
+            session.submit_verification(
+                VerificationSide::ExistingEndpoint,
+                VerificationDigest::new([1; 32]),
+                121
+            ),
+            Err(EnrollmentError::ClockRollback)
+        );
+        assert_eq!(session.state(), PairingState::Accepted);
     }
 
     #[test]
