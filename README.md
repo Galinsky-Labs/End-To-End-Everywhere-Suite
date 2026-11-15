@@ -56,6 +56,11 @@ The [application SDK preview](docs/application-sdk.md) owns archive transactions
 The local CLI supports explicitly selected ASCII-armored signed text and
 attachment delivery for email-friendly transport; see [CLI guidance](docs/cli.md).
 
+For disposable cross-service tests, use the [carrier testing guide](docs/CROSS_SERVICE_TESTING.md)
+and `scripts/cross_service_smoke.py`. Engineering builds can package an optional
+macOS/Linux Tk desktop file-vault interface and a local encrypted relay prototype;
+neither is production-ready or a hosted secure messaging service.
+
 A [provisional component and data-flow inventory](security/e2eesa-inventory.json) now records the current code and trust boundaries with [structural validation](scripts/validate_e2eesa_inventory.py). This is preliminary discovery only: the inventory has **not** been reviewed for completeness and it is not an E2EESA 0.2 conformance assessment.
 
 ## End-to-End Everywhere progress
