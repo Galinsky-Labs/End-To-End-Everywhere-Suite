@@ -30,8 +30,12 @@ impl VerificationQrCode {
         if text.len() > MAX_PAYLOAD_BYTES || text.trim() != text {
             return Err(EnrollmentError::InvalidIdentifier);
         }
-        let body = text.strip_prefix(PREFIX).ok_or(EnrollmentError::InvalidIdentifier)?;
-        let (id, encoded) = body.rsplit_once(':').ok_or(EnrollmentError::InvalidIdentifier)?;
+        let body = text
+            .strip_prefix(PREFIX)
+            .ok_or(EnrollmentError::InvalidIdentifier)?;
+        let (id, encoded) = body
+            .rsplit_once(':')
+            .ok_or(EnrollmentError::InvalidIdentifier)?;
         let enrollment_id = EnrollmentId::parse(id)?;
         if encoded.len() != 64
             || !encoded
@@ -47,7 +51,10 @@ impl VerificationQrCode {
                 .ok_or(EnrollmentError::InvalidIdentifier)?;
             *out = u8::from_str_radix(part, 16).map_err(|_| EnrollmentError::InvalidIdentifier)?;
         }
-        Ok(Self { enrollment_id, digest: VerificationDigest::new(digest) })
+        Ok(Self {
+            enrollment_id,
+            digest: VerificationDigest::new(digest),
+        })
     }
 }
 
