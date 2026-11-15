@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "repository": "neophilism/End-To-End-Everywhere-Suite",
+  "repository": "Galinsky-Labs/End-To-End-Everywhere-Suite",
   "kind": "unclassified",
   "monitoring": {
     "mode": "inventory"

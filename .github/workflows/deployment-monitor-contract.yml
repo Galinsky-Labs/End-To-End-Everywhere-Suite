@@ -1,4 +1,7 @@
 name: Deployment monitor contract
+# The former reusable workflow (neophilism/Development-Deployment-Monitor) has no
+# accessible Galinsky-Labs equivalent. Until one exists, this job performs a local
+# structural check only and is non-blocking (continue-on-error).
 on:
   pull_request:
     paths:
@@ -9,4 +12,21 @@ permissions:
   contents: read
 jobs:
   contract:
-    uses: neophilism/Development-Deployment-Monitor/.github/workflows/validate-client.yml@main
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - name: Local deployment-monitor record check (non-blocking)
+        env:
+          EXPECTED_REPOSITORY: ${{ github.repository }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          d = json.load(open(".github/deployment-monitor.json"))
+          assert d.get("schema_version") == 1, "schema_version must be 1"
+          assert d.get("repository") == os.environ["EXPECTED_REPOSITORY"], "repository mismatch"
+          assert isinstance(d.get("deployments"), list), "deployments must be a list"
+          b = d.get("budget", {})
+          assert b.get("monthly_usd_max", 0) >= 0 and isinstance(b.get("allow_billable_fallback"), bool)
+          print("deployment-monitor record structurally valid (upstream contract not available)")
+          PY
