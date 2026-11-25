@@ -1,6 +1,7 @@
 //! HTTP front end for the relay/sync server. TLS is terminated by the hosting
 //! platform; this process only ever handles ciphertext and signed requests.
-use e2ee_relay_server::{Limits, Request, Server};
+use e2ee_relay_server::gate::{Decision, Gate};
+use e2ee_relay_server::{Limits, Request, Response, Server};
 use std::io::Read;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -16,6 +17,10 @@ fn main() {
     let db = std::env::var("RELAY_DB_PATH").unwrap_or_else(|_| "relay.sqlite3".into());
     let limits = Limits::default();
     let mut server = Server::open(&db, limits).expect("open relay database");
+    let mut gate = Gate::from_env("e2ee-relay");
+    if gate.enabled() {
+        eprintln!("pre-launch password gate enabled");
+    }
     let http = tiny_http::Server::http(format!("0.0.0.0:{port}")).expect("bind HTTP listener");
     eprintln!("e2ee-relay-server listening on port {port} (database {db})");
     for mut incoming in http.incoming_requests() {
@@ -44,19 +49,37 @@ fn main() {
             .as_reader()
             .take(limits.max_body_bytes as u64 + 1)
             .read_to_end(&mut body);
+        let mut delay = false;
         let response = if read.is_err() {
             None
         } else {
-            Some(server.handle(
-                &Request {
-                    method: incoming.method().as_str().to_owned(),
-                    path: path.to_owned(),
-                    query,
-                    headers,
-                    body,
-                },
-                now_ms(),
-            ))
+            let req = Request {
+                method: incoming.method().as_str().to_owned(),
+                path: path.to_owned(),
+                query,
+                headers,
+                body,
+            };
+            let client = req
+                .header("x-forwarded-for")
+                .and_then(|v| v.split(',').next())
+                .map(|v| v.trim().to_owned())
+                .or_else(|| incoming.remote_addr().map(|a| a.ip().to_string()))
+                .unwrap_or_default();
+            let now = now_ms();
+            Some(match gate.check(&req, &client, now) {
+                Decision::Pass { robots } => {
+                    let mut r: Response = server.handle(&req, now);
+                    if robots {
+                        r.headers.push(("X-Robots-Tag", "noindex, nofollow".into()));
+                    }
+                    r
+                }
+                Decision::Respond { response, delay: d } => {
+                    delay = d;
+                    response
+                }
+            })
         };
         let reply = match response {
             Some(r) => {
@@ -74,6 +97,14 @@ fn main() {
             None => tiny_http::Response::from_data(b"{\"error\":\"bad-request\"}".to_vec())
                 .with_status_code(400),
         };
-        let _ = incoming.respond(reply);
+        if delay {
+            // Slow down password guessing without blocking other requests.
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(500));
+                let _ = incoming.respond(reply);
+            });
+        } else {
+            let _ = incoming.respond(reply);
+        }
     }
 }
