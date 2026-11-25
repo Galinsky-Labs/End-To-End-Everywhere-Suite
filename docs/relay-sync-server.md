@@ -45,3 +45,13 @@ and makes no certification claim.
 - No metadata privacy beyond opaque IDs (the service sees mailbox, sizes, timing, IPs).
 - Abuse control is limited to capabilities and quotas. No multi-instance coordination.
 - TLS is terminated by the hosting platform.
+
+## Pre-launch password gate
+While `SITE_PASSWORD` is set (non-empty) on the service, every request needs the
+`site_gate` cookie issued by `/__gate` (HMAC-SHA256 of a fixed label keyed by the
+password; changing the password revokes all cookies). Only `/healthz` (Render health
+check) and `/__gate` are exempt. Unauthenticated browser navigations are redirected
+to `/__gate`; API calls (`/v1/...`, non-HTML) get `401 {"error":"site_locked"}`. The
+gate runs before, and never replaces, the relay's Ed25519 request authentication.
+Unset or empty `SITE_PASSWORD` turns it off with no behaviour change. See
+`src/gate.rs`.

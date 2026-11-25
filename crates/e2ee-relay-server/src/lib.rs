@@ -25,6 +25,8 @@
 //! privacy beyond opaque identifiers, abuse controls beyond quotas, or
 //! multi-instance coordination.
 
+pub mod gate;
+
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD as B64, Engine};
 use e2ee_capsule::CapsuleLimits;
 use e2ee_transport::Delivery;
